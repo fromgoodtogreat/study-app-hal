@@ -1,0 +1,2540 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Upload, TrendingUp, BookOpen, Award, Target,
+  CheckCircle2, XCircle, ChevronRight, ChevronLeft,
+  RefreshCw, Plus, Trash2, FileText, Calendar,
+  Check, AlertCircle, Compass, Share2, Copy,
+  Layers, HelpCircle, ArrowLeft, Settings, Sparkles,
+  Camera, RotateCcw, Eye, EyeOff, Download, Lock, KeyRound
+} from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer, ReferenceLine
+} from 'recharts';
+
+// --- 落ち着いたナチュラルカラー設定 ---
+const SUBJECT_STYLES = {
+  四科: { bg: 'bg-[#E6EFE9]', text: 'text-[#3B6E52]', border: 'border-[#B8D4C4]', hex: '#4B8364' },
+  算数: { bg: 'bg-[#E6EFE9]', text: 'text-[#3B6E52]', border: 'border-[#B8D4C4]', hex: '#4B8364' },
+  国語: { bg: 'bg-[#F5E6E4]', text: 'text-[#A64B44]', border: 'border-[#E2BGBB]', hex: '#C86D65' },
+  理科: { bg: 'bg-[#FDF3DC]', text: 'text-[#9C711C]', border: 'border-[#EED59A]', hex: '#D49B35' },
+  社会: { bg: 'bg-[#E8EEF5]', text: 'text-[#3E5F8A]', border: 'border-[#C2D4E8]', hex: '#547AA5' }
+};
+
+const SCHOOL_COLORS = ['#4B8364', '#C86D65', '#D49B35', '#547AA5', '#8C659C'];
+
+// --- 単元マップの標準カリキュラム定義（小4・四谷大塚ベース） ---
+const CURRICULUM_MAP = {
+  算数: [
+    { category: '数と計算', units: ['整数・小数の計算', '単位の換算', '分数の計算', '還元算(□を求める)', 'およその数（概数）'] },
+    { category: '文章題（特殊算）', units: ['和差算', '植木算', '分配算', 'つるかめ算', '消去算', '過不足算・差集め算'] },
+    { category: '数の性質・規則性', units: ['約数と倍数', 'あまりと整数の問題', '周期算', '等差数列', '方陣算'] },
+    { category: '平面・立体図形', units: ['角度', '正方形と長方形の面積', '三角形と四角形の面積', '円とおうぎ形', '直方体と立方体'] }
+  ],
+  国語: [
+    { category: '漢字・知識', units: ['漢字の読み書き', '四字熟語・ことわざ', '慣用句', '敬語・文法', '同音異義語・類義語'] },
+    { category: '物語・小説文', units: ['登場人物の心情理解', '場面の移り変わり', '行動の理由説明', '主題の把握'] },
+    { category: '説明・論説文', units: ['接続語・指示語', '段落の役割と構成', '筆者の主張・要旨', '抜き出し・要約記述'] }
+  ],
+  理科: [
+    { category: '生物と環境', units: ['春の生物', '夏の生物', '昆虫のからだ', '植物のつくりと成長', 'ヒトのからだ'] },
+    { category: '物質とエネルギー', units: ['磁石の性質', '乾電池と豆電球', '光と鏡の性質', '空気と水の性質', 'ものの温度と体積'] },
+    { category: '地球と宇宙', units: ['星座と星のغき', '月の満ち欠け', '天気と気温の変化', '流れる水のはたらき'] }
+  ],
+  社会: [
+    { category: '日本の地理（基礎）', units: ['都道府県と県庁所在地', '地図記号と縮尺', '日本の地形・川・平野', '日本の気候区分'] },
+    { category: 'くらしと産業', units: ['日本の農業（米・野菜）', '水産業と漁港', 'ゴミ処理とリサイクル', '上水道と電力・防災'] },
+    { category: '地方別の特色', units: ['九州地方', '中国・四国地方', '近畿地方', '中部・関東・東北・北海道'] }
+  ]
+};
+
+// --- かわいい「もちくま」SVGイラスト ---
+const MochiKumaIcon = ({ size = 48, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* 耳 */}
+    <circle cx="26" cy="28" r="12" fill="#E3B788" />
+    <circle cx="26" cy="28" r="6" fill="#F4D7B6" />
+    <circle cx="74" cy="28" r="12" fill="#E3B788" />
+    <circle cx="74" cy="28" r="6" fill="#F4D7B6" />
+    {/* 頭のふたば */}
+    <path d="M50 18 C48 8, 36 8, 40 16 C43 20, 48 19, 50 18 Z" fill="#68A36E" />
+    <path d="M50 18 C52 8, 64 8, 60 16 C57 20, 52 19, 50 18 Z" fill="#81B887" />
+    <path d="M50 16 L50 23" stroke="#538558" strokeWidth="2.5" strokeLinecap="round" />
+    {/* 体・顔 */}
+    <rect x="18" y="22" width="64" height="62" rx="31" fill="#ECC59A" />
+    <ellipse cx="50" cy="60" rx="22" ry="18" fill="#FFF7EB" />
+    {/* ほっぺ */}
+    <ellipse cx="29" cy="52" rx="5" ry="3" fill="#F09C8B" opacity="0.7" />
+    <ellipse cx="71" cy="52" rx="5" ry="3" fill="#F09C8B" opacity="0.7" />
+    {/* 目（にっこり） */}
+    <path d="M34 45 Q38 40 42 45" stroke="#5C4433" strokeWidth="3" strokeLinecap="round" fill="none" />
+    <path d="M58 45 Q62 40 66 45" stroke="#5C4433" strokeWidth="3" strokeLinecap="round" fill="none" />
+    {/* 鼻と口 */}
+    <ellipse cx="50" cy="48" rx="3.5" ry="2.5" fill="#5C4433" />
+    <path d="M46 52 Q50 56 54 52" stroke="#5C4433" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    {/* 手足 */}
+    <ellipse cx="22" cy="60" rx="6" ry="9" transform="rotate(-20 22 60)" fill="#E3B788" />
+    <ellipse cx="78" cy="60" rx="6" ry="9" transform="rotate(20 78 60)" fill="#E3B788" />
+    <ellipse cx="36" cy="84" rx="8" ry="5" fill="#D5A676" />
+    <ellipse cx="64" cy="84" rx="8" ry="5" fill="#D5A676" />
+  </svg>
+);
+
+const STORAGE_KEY = 'chugaku_juken_bansou_navi_v1';
+
+export default function App() {
+  // --- メイン画面遷移ステート ---
+  // 'home' | 'upload' | 'unitMap' | 'dojo' | 'flashcards' | 'schools' | 'records' | 'share'
+  const [activeView, setActiveView] = useState('home');
+
+  // --- 永続化データ（初期状態はすべて空！子ども・保護者が後から追加する） ---
+  const [studentName, setStudentName] = useState('');
+  const [tests, setTests] = useState([]);
+  const [schools, setSchools] = useState([
+    { id: 's-1', name: '', targetDeviation: '', color: SCHOOL_COLORS[0] },
+    { id: 's-2', name: '', targetDeviation: '', color: SCHOOL_COLORS[1] },
+    { id: 's-3', name: '', targetDeviation: '', color: SCHOOL_COLORS[2] },
+    { id: 's-4', name: '', targetDeviation: '', color: SCHOOL_COLORS[3] },
+    { id: 's-5', name: '', targetDeviation: '', color: SCHOOL_COLORS[4] }
+  ]);
+  const [flashcards, setFlashcards] = useState([]);
+  const [acorns, setAcorns] = useState(0); // どんぐりポイント（控えめな育成要素）
+  const [solvedQuestionIds, setSolvedQuestionIds] = useState([]);
+  const [studyLogs, setStudyLogs] = useState([]);
+
+  // --- 合言葉（パスコード）ロック用ステート ---
+  const [passcode, setPasscode] = useState('1225'); // 初期合言葉（変更可能）
+  const [isLocked, setIsLocked] = useState(true);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [lockError, setLockError] = useState('');
+  const [newPasscodeInput, setNewPasscodeInput] = useState('');
+
+  // --- フィルター＆設定ステート ---
+  const [selectedSubject, setSelectedSubject] = useState('算数');
+  const [chartSubject, setChartSubject] = useState('四科');
+  const [includeCurriculum, setIncludeCurriculum] = useState(false); // カリキュラムテストをグラフに含めるか
+  const [chartMetric, setChartMetric] = useState('deviation'); // 'deviation' | 'score'
+  const [accuracyThreshold, setAccuracyThreshold] = useState(50); // 30, 40, 50%基準の切り替え
+
+  // --- トースト通知 ---
+  const [toast, setToast] = useState(null);
+  const showToast = (text, acornGain = 0) => {
+    if (acornGain > 0) {
+      setAcorns(prev => prev + acornGain);
+    }
+    setToast({ text, acornGain });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  // --- 初回ロード（LocalStorage ＆ 共有URLパラメータ対応） ---
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.studentName !== undefined) setStudentName(parsed.studentName);
+        if (Array.isArray(parsed.tests)) setTests(parsed.tests);
+        if (Array.isArray(parsed.schools)) setSchools(parsed.schools);
+        if (Array.isArray(parsed.flashcards)) setFlashcards(parsed.flashcards);
+        if (typeof parsed.acorns === 'number') setAcorns(parsed.acorns);
+        if (Array.isArray(parsed.solvedQuestionIds)) setSolvedQuestionIds(parsed.solvedQuestionIds);
+        if (Array.isArray(parsed.studyLogs)) setStudyLogs(parsed.studyLogs);
+        if (parsed.passcode) setPasscode(parsed.passcode);
+      }
+      if (sessionStorage.getItem('juken_navi_unlocked') === 'true') {
+        setIsLocked(false);
+      }
+    } catch (e) {
+      console.error('Failed to load state', e);
+    }
+  }, []);
+
+  // --- 自動保存 ---
+  useEffect(() => {
+    try {
+      const dataToSave = {
+        studentName,
+        tests,
+        schools,
+        flashcards,
+        acorns,
+        solvedQuestionIds,
+        studyLogs,
+        passcode
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error('Failed to save state', e);
+    }
+  }, [studentName, tests, schools, flashcards, acorns, solvedQuestionIds, studyLogs, passcode]);
+
+  // --- 合言葉ロック解除ハンドラ ---
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    if (passcodeInput.trim() === passcode) {
+      setIsLocked(false);
+      setLockError('');
+      setPasscodeInput('');
+      sessionStorage.setItem('juken_navi_unlocked', 'true');
+    } else {
+      setLockError('合言葉が違います。もう一度入力してください。');
+    }
+  };
+
+  // --- テスト追加フォーム用ステート ---
+  const [uploadForm, setUploadForm] = useState({
+    name: '',
+    type: '組分けテスト',
+    date: new Date().toISOString().split('T')[0],
+    course: '',
+    scores: {
+      算数: { score: '', maxScore: 200, deviation: '' },
+      国語: { score: '', maxScore: 150, deviation: '' },
+      理科: { score: '', maxScore: 100, deviation: '' },
+      社会: { score: '', maxScore: 100, deviation: '' },
+      四科: { score: '', maxScore: 550, deviation: '' }
+    },
+    files: {
+      answerSheet: null,
+      explanation: null,
+      accuracySheet: null
+    },
+    questions: [
+      { id: 'q-init-1', subject: '算数', number: '大問2(1)', unit: '和差算', isCorrect: false, accuracyRate: 55, questionSummary: '' }
+    ]
+  });
+  const [isScanningFiles, setIsScanningFiles] = useState(false);
+
+  // --- AI道場（演習・解き直し画面）ステート ---
+  const [activeQuestion, setActiveQuestion] = useState(null);
+  const [userAnswerInput, setUserAnswerInput] = useState('');
+  const [answerFeedback, setAnswerFeedback] = useState(null); // 'correct' | 'incorrect' | null
+  const [hintLevel, setHintLevel] = useState(0); // 0, 1, 2
+  const [showFullExplanation, setShowFullExplanation] = useState(false);
+  const [aiGeneratedContent, setAiGeneratedContent] = useState(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  // --- 暗記カード（理科・社会）用ステート ---
+  const [cardSubjectFilter, setCardSubjectFilter] = useState('すべて');
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isCardFlipped, setIsCardFlipped] = useState(false);
+  const [newCardForm, setNewCardForm] = useState({ subject: '理科', unit: '', front: '', back: '' });
+
+  // --- iPadデータ共有・バックアップ用ステート ---
+  const [backupCodeInput, setBackupCodeInput] = useState('');
+
+  // --- テスト種別変更時に満点を調整 ---
+  const handleTestTypeChange = (type) => {
+    let defaultMax = { 算数: 200, 国語: 150, 理科: 100, 社会: 100, 四科: 550 };
+    if (type === 'カリキュラムテスト') {
+      defaultMax = { 算数: 100, 国語: 100, 理科: 50, 社会: 50, 四科: 300 };
+    } else if (type === '全統小') {
+      defaultMax = { 算数: 150, 国語: 150, 理科: 100, 社会: 100, 四科: 500 };
+    }
+    setUploadForm(prev => ({
+      ...prev,
+      type,
+      scores: {
+        算数: { ...prev.scores.算数, maxScore: defaultMax.算数 },
+        国語: { ...prev.scores.国語, maxScore: defaultMax.国語 },
+        理科: { ...prev.scores.理科, maxScore: defaultMax.理科 },
+        社会: { ...prev.scores.社会, maxScore: defaultMax.社会 },
+        四科: { ...prev.scores.四科, maxScore: defaultMax.四科 }
+      }
+    }));
+  };
+
+  // --- グラフ表示用データの生成 ---
+  const chartData = useMemo(() => {
+    return tests
+      .filter(t => includeCurriculum || t.type !== 'カリキュラムテスト')
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(t => {
+        const sub = t.subjects[chartSubject] || t.subjects['四科'];
+        const scorePct = sub.maxScore ? Math.round((sub.score / sub.maxScore) * 100) : 0;
+        return {
+          name: t.name,
+          date: t.date,
+          type: t.type,
+          course: t.course,
+          deviation: Number(sub.deviation) || 0,
+          score: Number(sub.score) || 0,
+          maxScore: Number(sub.maxScore) || 100,
+          scorePercentage: scorePct
+        };
+      });
+  }, [tests, includeCurriculum, chartSubject]);
+
+  // --- 登録済みの有効な志望校リスト ---
+  const validSchools = useMemo(() => {
+    return schools.filter(s => s.name.trim() !== '' && Number(s.targetDeviation) > 0);
+  }, [schools]);
+
+  // --- 直近の偏差値 ---
+  const latestDeviation = useMemo(() => {
+    if (chartData.length === 0) return null;
+    return chartData[chartData.length - 1].deviation;
+  }, [chartData]);
+
+  // --- 全問題リストのフラット化 ---
+  const allQuestions = useMemo(() => {
+    const list = [];
+    tests.forEach(t => {
+      (t.questions || []).forEach(q => {
+        list.push({
+          ...q,
+          testName: t.name,
+          testType: t.type,
+          testDate: t.date,
+          isSolved: solvedQuestionIds.includes(q.id)
+        });
+      });
+    });
+    return list;
+  }, [tests, solvedQuestionIds]);
+
+  // --- 単元ごとの正答率＆ステータス集計（image_0, image_3 参考） ---
+  const unitStatsMap = useMemo(() => {
+    const map = {};
+    allQuestions.forEach(q => {
+      const key = `${q.subject}:${q.unit}`;
+      if (!map[key]) {
+        map[key] = { subject: q.subject, unit: q.unit, total: 0, correct: 0, missedHighAcc: 0, questions: [] };
+      }
+      map[key].total += 1;
+      if (q.isCorrect || q.isSolved) {
+        map[key].correct += 1;
+      } else if (q.accuracyRate >= accuracyThreshold) {
+        map[key].missedHighAcc += 1;
+      }
+      map[key].questions.push(q);
+    });
+    return map;
+  }, [allQuestions, accuracyThreshold]);
+
+  // --- ファイル選択ハンドラ (PDF・写真対応) ---
+  const handleFileSelect = (key, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64String = typeof reader.result === 'string' ? reader.result.split(',')[1] : '';
+      setUploadForm(prev => ({
+        ...prev,
+        files: {
+          ...prev.files,
+          [key]: {
+            name: file.name,
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            mimeType: file.type,
+            base64: file.type.startsWith('image/') ? base64String : null
+          }
+        }
+      }));
+      showToast(`「${file.name}」を選択しました`, 5);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // --- AIによるPDF/写真からの問題データ読み取り補助 ---
+  const handleAiScanFiles = async () => {
+    setIsScanningFiles(true);
+    const apiKey = "";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+    try {
+      const parts = [
+        {
+          text: `中学受験（小学4年生・四谷大塚など）のテスト答案・解説・正答率表から、テスト問題データを4問抽出または作成してください。
+テスト種別: ${uploadForm.type}
+科目は算数・国語・理科・社会を含めてください。`
+        }
+      ];
+
+      if (uploadForm.files.answerSheet?.base64) {
+        parts.push({
+          inlineData: {
+            mimeType: uploadForm.files.answerSheet.mimeType || "image/png",
+            data: uploadForm.files.answerSheet.base64
+          }
+        });
+      }
+
+      const payload = {
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              suggestedName: { type: "STRING" },
+              questions: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    subject: { type: "STRING" },
+                    number: { type: "STRING" },
+                    unit: { type: "STRING" },
+                    isCorrect: { type: "BOOLEAN" },
+                    accuracyRate: { type: "NUMBER" },
+                    questionSummary: { type: "STRING" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      const parsed = JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+
+      if (parsed.questions && parsed.questions.length > 0) {
+        setUploadForm(prev => ({
+          ...prev,
+          name: prev.name || parsed.suggestedName || `第1回 ${prev.type}`,
+          questions: parsed.questions.map((q, idx) => ({
+            id: `scan-${Date.now()}-${idx}`,
+            subject: ['算数', '国語', '理科', '社会'].includes(q.subject) ? q.subject : '算数',
+            number: q.number || `大問${idx + 1}(1)`,
+            unit: q.unit || '整数・小数の計算',
+            isCorrect: Boolean(q.isCorrect),
+            accuracyRate: Number(q.accuracyRate) || 55,
+            questionSummary: q.questionSummary || 'テスト問題の要点'
+          }))
+        }));
+        showToast('アップロードされたファイルから問題と単元を読み取りました！', 15);
+      } else {
+        throw new Error('Empty');
+      }
+    } catch (e) {
+      // オフライン・API未設定時のスマート入力補助
+      setUploadForm(prev => ({
+        ...prev,
+        name: prev.name || `第1回 ${prev.type}`,
+        questions: [
+          { id: `scan-${Date.now()}-1`, subject: '算数', number: '大問2(2)', unit: '和差算', isCorrect: false, accuracyRate: 58, questionSummary: '2人の持っている 금액の和と差からそれぞれの金額を求める問題' },
+          { id: `scan-${Date.now()}-2`, subject: '算数', number: '大問4(1)', unit: '植木算', isCorrect: false, accuracyRate: 42, questionSummary: '木と木の間の長さと本数から全体の距離を求める問題' },
+          { id: `scan-${Date.now()}-3`, subject: '算数', number: '大問5(2)', unit: '角度', isCorrect: true, accuracyRate: 65, questionSummary: '平行線と折り返した図形の角度を求める問題' },
+          { id: `scan-${Date.now()}-4`, subject: '理科', number: '大問3 問2', unit: '磁石の性質', isCorrect: false, accuracyRate: 35, questionSummary: '電磁石の導線の巻き数と方位磁針の振れ方の問題' }
+        ]
+      }));
+      showToast('テスト問題の入力テンプレートをセットしました！必要に応じて修正してください。', 10);
+    } finally {
+      setIsScanningFiles(false);
+    }
+  };
+
+  // --- テスト結果の新規保存 ---
+  const handleSaveTest = (e) => {
+    e.preventDefault();
+    const s = uploadForm.scores;
+    const sumScore =
+      (Number(s.算数.score) || 0) +
+      (Number(s.国語.score) || 0) +
+      (Number(s.理科.score) || 0) +
+      (Number(s.社会.score) || 0);
+
+    const validDevs = ['算数', '国語', '理科', '社会']
+      .map(k => Number(s[k].deviation))
+      .filter(v => v > 0);
+    const avgDev = validDevs.length > 0
+      ? Number((validDevs.reduce((a, b) => a + b, 0) / validDevs.length).toFixed(1))
+      : 50.0;
+
+    const newTest = {
+      id: `test-${Date.now()}`,
+      name: uploadForm.name.trim() || `${uploadForm.type} (${uploadForm.date})`,
+      type: uploadForm.type,
+      date: uploadForm.date,
+      course: uploadForm.course.trim() || '標準',
+      files: uploadForm.files,
+      subjects: {
+        算数: { score: Number(s.算数.score) || 0, maxScore: Number(s.算数.maxScore), deviation: Number(s.算数.deviation) || 50 },
+        国語: { score: Number(s.国語.score) || 0, maxScore: Number(s.国語.maxScore), deviation: Number(s.国語.deviation) || 50 },
+        理科: { score: Number(s.理科.score) || 0, maxScore: Number(s.理科.maxScore), deviation: Number(s.理科.deviation) || 50 },
+        社会: { score: Number(s.社会.score) || 0, maxScore: Number(s.社会.maxScore), deviation: Number(s.社会.deviation) || 50 },
+        四科: {
+          score: Number(s.四科.score) || sumScore,
+          maxScore: Number(s.四科.maxScore),
+          deviation: Number(s.四科.deviation) || avgDev
+        }
+      },
+      questions: uploadForm.questions
+        .filter(q => q.unit.trim() !== '' || q.questionSummary.trim() !== '')
+        .map((q, idx) => ({
+          ...q,
+          id: `q-${Date.now()}-${idx}`,
+          unit: q.unit.trim() || '基本単元',
+          questionSummary: q.questionSummary.trim() || `${q.subject} ${q.number}の問題`,
+          accuracyRate: Number(q.accuracyRate) || 50
+        }))
+    };
+
+    setTests(prev => [...prev, newTest]);
+    setStudyLogs(prev => [
+      { id: `log-${Date.now()}`, date: new Date().toLocaleDateString('ja-JP'), title: `テスト登録：${newTest.name}` },
+      ...prev
+    ]);
+
+    // フォーム初期化
+    setUploadForm(prev => ({
+      ...prev,
+      name: '',
+      scores: {
+        算数: { ...prev.scores.算数, score: '', deviation: '' },
+        国語: { ...prev.scores.国語, score: '', deviation: '' },
+        理科: { ...prev.scores.理科, score: '', deviation: '' },
+        社会: { ...prev.scores.社会, score: '', deviation: '' },
+        四科: { ...prev.scores.四科, score: '', deviation: '' }
+      },
+      files: { answerSheet: null, explanation: null, accuracySheet: null },
+      questions: [
+        { id: `q-init-${Date.now()}`, subject: '算数', number: '大問2(1)', unit: '', isCorrect: false, accuracyRate: 50, questionSummary: '' }
+      ]
+    }));
+
+    showToast(`「${newTest.name}」を登録しました！どんぐり+30個`, 30);
+    setActiveView('home');
+  };
+
+  // --- AI道場：詳しい解説＆類題・応用問題の生成（image_2.png の演習UIスタイル） ---
+  const startDojoExercise = async (question, mode) => {
+    // mode: 'review' (解き直し＆類題) | 'advanced' (得意を伸ばす応用問題)
+    setActiveQuestion({ ...question, mode });
+    setUserAnswerInput('');
+    setAnswerFeedback(null);
+    setHintLevel(0);
+    setShowFullExplanation(false);
+    setIsGeneratingAi(true);
+    setAiGeneratedContent(null);
+    setActiveView('dojo');
+
+    const isReview = mode === 'review';
+    const systemPrompt = `あなたは中学受験を目指す小学4年生に寄り添う、優しくてわかりやすい「パーソナルコーチ（もちくま先生）」です。
+落ち着いた丁寧なトーンで、子どもが自力で解けるように段階的なヒントと詳しい解説、そして良質な問題を作成してください。`;
+
+    const userPrompt = isReview
+      ? `以下のテストで間違えた問題について、解き直しのための「類似問題（類題）」と「2段階のヒント」「詳しい解き方・解説」を作成してください。
+科目: ${question.subject}
+単元: ${question.unit}
+全体の正答率: ${question.accuracyRate}%
+元の問題の内容: ${question.questionSummary}`
+      : `以下のテストで正解できた得意な問題について、さらに実力を伸ばす「少し発展的な応用問題」と「2段階のヒント」「詳しい解き方・解説」を作成してください。
+科目: ${question.subject}
+単元: ${question.unit}
+全体の正答率: ${question.accuracyRate}%
+元の問題の内容: ${question.questionSummary}`;
+
+    const payload = {
+      contents: [{ parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            problemText: { type: "STRING", description: "小学生が解くための具体的な問題文" },
+            expectedAnswer: { type: "STRING", description: "簡潔な答え（例: 360円、15cm、ア など）" },
+            hint1: { type: "STRING", description: "最初の取っ掛かりになるヒント1" },
+            hint2: { type: "STRING", description: "式や考え方の核心に迫るヒント2" },
+            stepExplanation: {
+              type: "ARRAY",
+              items: { type: "STRING" },
+              description: "ステップごとの詳しい解説（3ステップ程度）"
+            },
+            coachComment: { type: "STRING", description: "もちくまコーチからの励ましコメント" }
+          }
+        }
+      }
+    };
+
+    const apiKey = "";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        setAiGeneratedContent(JSON.parse(text));
+      } else {
+        throw new Error('Fallback');
+      }
+    } catch (e) {
+      // フォールバック演習データ（image_2.png 参考の具体的な良問）
+      if (question.subject === '算数') {
+        setAiGeneratedContent({
+          problemText: isReview
+            ? `【類題演習】AさんとBさんが同じ金額を出し合って、クッキーを24枚買いました。買った後でAさんがBさんより6枚多くもらうことになり、もらった枚数分だけお金を出すことにしたので、AさんはBさんに150円渡しました。クッキー1枚の値段は何円ですか。（元の問題：${question.questionSummary}）`
+            : `【応用演習】Aさん、Bさん、Cさんの3人が同じ金額を出し合ってノートを36冊買いました。分けるときにAさんとBさんはCさんより3冊ずつ多くもらったため、AさんとBさんはCさんにそれぞれ120円ずつ渡しました。ノート1冊の値段は何円ですか。`,
+          expectedAnswer: isReview ? '50' : '40',
+          hint1: `まず、それぞれが何枚（何冊）もらったかを「和差算」や線分図を使って求めましょう。はじめは同じ金額を出したので、「平均の枚数」のお金を出したことになります。`,
+          hint2: isReview
+            ? `24枚を2人で同じ数ずつ分けると1人12枚です。Aさんは(24+6)÷2＝15枚もらったので、予定より「3枚分」多くもらい、その代金が150円にあたります。`
+            : `36冊を3人で同じ数ずつ分けると1人12冊です。Cさんは何冊もらったか求めて、予定の12冊との差を考えましょう。`,
+          stepExplanation: isReview
+            ? [
+                'ステップ1：AさんとBさんが実際にもらった枚数を和差算で求めます。Aさんは (24＋6)÷2＝15枚、Bさんは 24－15＝9枚 です。',
+                'ステップ2：最初は2人とも同じ金額（24÷2＝12枚分）を出していました。',
+                'ステップ3：Aさんは12枚より 15－12＝3枚 多くもらったため、Bさんに150円渡しました。よってクッキー1枚は 150÷3＝50円 です。'
+              ]
+            : [
+                'ステップ1：36冊を同じ数ずつ分けると 36÷3＝12冊ずつです。',
+                'ステップ2：AさんとBさんがCさんより3冊ずつ多いので、Cさんは (36－3×2)÷3＝10冊 もらいました。',
+                'ステップ3：Cさんは12冊分の代金を払って10冊しかもらわなかったので、2冊分のお金（120×2＝240円）を返してもらいました。よって1冊 240÷6＝40円 です。'
+              ],
+          coachComment: `「${question.unit}」は図を描いて整理するとグッと解きやすくなるよ！一歩ずつ確認してみよう。`
+        });
+      } else {
+        setAiGeneratedContent({
+          problemText: isReview
+            ? `【${question.unit}・類題】「${question.questionSummary}」に関する基本確認問題です。問題文の条件やキーワードに注目して、自分の言葉や知識で答えをまとめてみましょう。`
+            : `【${question.unit}・応用】「${question.questionSummary}」から一歩進んだ入試レベルの応用問題です。「なぜそうなるのか」の理由も含めて答えを考えてみましょう。`,
+          expectedAnswer: '解説の重要ポイントを確認',
+          hint1: `まずは「${question.unit}」の基本用語や、問題文に出てくる変化のきっかけ（接続語や実験条件の違い）に線を引いてみましょう。`,
+          hint2: `変化する前と後の「ちがい」を比べてみると、答えの根拠が見つかります。`,
+          stepExplanation: [
+            `ステップ1：問題で聞かれていること（「理由」「名称」「記号」など）の文末を確かめます。`,
+            `ステップ2：「${question.unit}」の重要ポイントを思い出し、条件と照らし合わせます。`,
+            `ステップ3：抜け漏れがないか確認して答えを完成させましょう。`
+          ],
+          coachComment: `正答率${question.accuracyRate}%の問題にしっかり向き合えてえらいね！`
+        });
+      }
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
+  // --- 育成ステージ（おたのしみ・控えめなゲーム要素） ---
+  const coachStage = useMemo(() => {
+    if (acorns < 50) return { level: 1, title: 'ふたばコーチ', badge: '🌱', next: 50, desc: 'テストの登録や解き直しで「どんぐり」が集まるよ！' };
+    if (acorns < 150) return { level: 2, title: 'わかばコーチ', badge: '🌿', next: 150, desc: 'いいペース！コツコツ復習する習慣がついてきたね。' };
+    if (acorns < 300) return { level: 3, title: 'みのりの木コーチ', badge: '🌳', next: 300, desc: '苦手な単元が少しずつ得意に変わってきているよ！' };
+    return { level: 4, title: '大樹のマスターコーチ', badge: '👑🌳', next: 500, desc: '2年間の積み重ねが大きな力になっているよ！自信をもっていこう！' };
+  }, [acorns]);
+
+  // --- クリップボードコピー関数（iFrame制限対応） ---
+  const copyToClipboard = (text, successMsg) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showToast(successMsg, 0);
+    } catch (err) {
+      showToast('コピーに失敗しました', 0);
+    }
+    document.body.removeChild(textarea);
+  };
+
+  // --- データ引き継ぎコード書き出し・読み込み（iPad共有用） ---
+  const exportBackupCode = () => {
+    const payload = { studentName, tests, schools, flashcards, acorns, solvedQuestionIds, studyLogs };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    copyToClipboard(encoded, 'iPad引き継ぎ用データコードをコピーしました！');
+  };
+
+  const importBackupCode = () => {
+    if (!backupCodeInput.trim()) return;
+    try {
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(backupCodeInput.trim()))));
+      if (decoded.tests) setTests(decoded.tests);
+      if (decoded.schools) setSchools(decoded.schools);
+      if (decoded.flashcards) setFlashcards(decoded.flashcards);
+      if (decoded.studentName !== undefined) setStudentName(decoded.studentName);
+      if (typeof decoded.acorns === 'number') setAcorns(decoded.acorns);
+      if (Array.isArray(decoded.solvedQuestionIds)) setSolvedQuestionIds(decoded.solvedQuestionIds);
+      setBackupCodeInput('');
+      showToast('データを復元・同期しました！', 0);
+      setActiveView('home');
+    } catch (e) {
+      showToast('データコードの形式が正しくありません。', 0);
+    }
+  };
+
+  // --- フィルタリングされた暗記カード ---
+  const filteredCards = useMemo(() => {
+    return flashcards.filter(c => cardSubjectFilter === 'すべて' || c.subject === cardSubjectFilter);
+  }, [flashcards, cardSubjectFilter]);
+
+  // --- ロック画面表示 ---
+  if (isLocked) {
+    return (
+      <div className="min-h-screen bg-[#F3EFE6] text-[#3D352E] font-sans flex items-center justify-center p-4">
+        <div className="bg-[#FFFDF9] border-2 border-[#D8C5A5] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-lg text-center space-y-5">
+          <div className="flex justify-center">
+            <div className="bg-[#F9F6F0] p-3 rounded-full border border-[#E2D9C8]">
+              <MochiKumaIcon size={68} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1 bg-[#E6EFE9] text-[#2C5840] text-xs font-extrabold px-3 py-1 rounded-full">
+              <Lock className="w-3.5 h-3.5" /> ファミリー専用ロック
+            </span>
+            <h1 className="text-xl font-extrabold text-[#3D352E]">中学受験 伴走ナビ</h1>
+            <p className="text-xs text-[#7A6F63] leading-relaxed">
+              大切な学習記録を守るため、家族の「合言葉（パスコード）」を入力してロックを解除してください。
+            </p>
+          </div>
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="合言葉を入力（初期値: 1225）"
+              value={passcodeInput}
+              onChange={e => {
+                setPasscodeInput(e.target.value);
+                setLockError('');
+              }}
+              className="w-full bg-[#F9F6F0] border-2 border-[#D8C5A5] rounded-2xl px-4 py-3 text-center text-lg font-extrabold tracking-widest text-[#3D352E] focus:outline-none focus:border-[#4B8364]"
+            />
+            {lockError && (
+              <p className="text-xs font-bold text-[#C86D65]">{lockError}</p>
+            )}
+            <button
+              type="submit"
+              className="w-full bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold py-3.5 rounded-full shadow-sm transition text-sm"
+            >
+              ロックを解除してはじめる
+            </button>
+          </form>
+
+          <p className="text-[11px] text-[#7A6F63] bg-[#F9F6F0] p-3 rounded-xl border border-[#EAE3D5]">
+            💡 初期設定の合言葉は <strong>1225</strong> です。ログイン後に右上の「共有」ボタンから好きな合言葉に変更できます。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F3EFE6] text-[#3D352E] font-sans pb-20 selection:bg-[#D5E3DA]">
+      {/* トースト通知 */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 bg-[#FFFDF9] border-2 border-[#4B8364] shadow-lg rounded-2xl px-5 py-3.5 flex items-center gap-3 animate-bounce">
+          <MochiKumaIcon size={36} />
+          <div>
+            <p className="font-bold text-sm text-[#3D352E]">{toast.text}</p>
+            {toast.acornGain > 0 && (
+              <p className="text-xs font-bold text-[#4B8364]">🌰 どんぐり +{toast.acornGain}個 獲得！</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 上部ナチュラルヘッダー */}
+      <header className="bg-[#E6D5B8] border-b border-[#D8C5A5] sticky top-0 z-30 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div
+            onClick={() => setActiveView('home')}
+            className="cursor-pointer flex items-center gap-2.5 group"
+          >
+            {activeView !== 'home' && (
+              <span className="bg-[#FFFDF9] text-[#5C5248] px-2.5 py-1 rounded-xl text-xs font-bold border border-[#D8C5A5] flex items-center gap-1 hover:bg-[#F5EFE6] transition">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                ホームへもどる
+              </span>
+            )}
+            <h1 className="text-lg md:text-xl font-extrabold tracking-tight text-[#3D352E] flex items-center gap-2">
+              <span>中学受験 伴走ナビ</span>
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* すぐロックするボタン */}
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('juken_navi_unlocked');
+                setIsLocked(true);
+              }}
+              title="画面をロックする"
+              className="bg-[#FFFDF9]/90 hover:bg-[#FFFDF9] text-[#5C5248] border border-[#D4C3A3] px-2.5 py-1.5 rounded-2xl text-xs font-bold flex items-center gap-1 shadow-sm transition"
+            >
+              <Lock className="w-3.5 h-3.5 text-[#C86D65]" />
+              <span className="hidden md:inline">ロック</span>
+            </button>
+
+            {/* iPad共有ボタン */}
+            <button
+              onClick={() => setActiveView('share')}
+              className="bg-[#FFFDF9]/90 hover:bg-[#FFFDF9] text-[#5C5248] border border-[#D4C3A3] px-3 py-1.5 rounded-2xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#4B8364]" />
+              <span className="hidden sm:inline">iPad共有・データ保存</span>
+              <span className="sm:hidden">共有</span>
+            </button>
+
+            {/* パーソナルコーチバッジ */}
+            <div
+              onClick={() => setActiveView('records')}
+              className="cursor-pointer bg-[#FFFDF9] border border-[#D4C3A3] px-3 py-1 rounded-2xl flex items-center gap-2 shadow-sm hover:bg-[#FAF6F0] transition"
+            >
+              <MochiKumaIcon size={28} />
+              <div className="text-left">
+                <p className="text-[10px] font-bold text-[#7A6F63] leading-none">パーソナルコーチ</p>
+                <p className="text-xs font-extrabold text-[#3D352E] flex items-center gap-1">
+                  <span>Lv.{coachStage.level}</span>
+                  <span className="text-[#4B8364]">🌰 {acorns}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* メイン領域 */}
+      <main className="max-w-6xl mx-auto px-4 pt-6">
+        {/* ==================== 1. ホーム画面（生成画像イメージ忠実再現） ==================== */}
+        {activeView === 'home' && (
+          <div className="space-y-6">
+            {/* もちくま挨拶バナー */}
+            <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <MochiKumaIcon size={60} className="shrink-0" />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="お名前を入力"
+                      value={studentName}
+                      onChange={e => setStudentName(e.target.value)}
+                      className="bg-[#F3EFE6] border border-[#D8C5A5] rounded-xl px-3 py-1 text-base sm:text-lg font-extrabold text-[#3D352E] w-36 focus:outline-none focus:border-[#4B8364]"
+                    />
+                    <span className="text-base sm:text-xl font-extrabold text-[#3D352E]">
+                      ちゃん、こんにちは！今日も一歩一歩ずつ進めよう！
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#7A6F63] mt-1">
+                    {tests.length === 0
+                      ? 'まずは最初のテスト結果や目標の志望校を登録して、あなた専用の学習ナビを作ろう！'
+                      : `現在 ${tests.length} 回のテストを記録中。間違えた問題を正答率基準（${accuracyThreshold}%以上）で復習しよう！`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* メイン2カラムグリッド（添付デザイン構成） */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* 左カラム（テスト追加 ＆ 成績・志望校グラフ ＆ 志望校設定） */}
+              <div className="lg:col-span-6 space-y-6">
+                {/* カード1：テスト結果・解答を追加する */}
+                <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E] flex items-center gap-2">
+                      <Camera className="w-5 h-5 text-[#4B8364]" />
+                      テスト結果・解答を追加する
+                    </h2>
+                    {tests.length > 0 && (
+                      <span className="text-xs font-bold bg-[#E6EFE9] text-[#3B6E52] px-2.5 py-1 rounded-full">
+                        登録済 {tests.length}件
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setActiveView('upload')}
+                    className="w-full bg-[#4B8364] hover:bg-[#3B6E52] text-white font-bold py-3 px-4 rounded-full shadow-sm transition text-sm sm:text-base flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    PDFや写真のアップロード、新規登録
+                  </button>
+
+                  {/* イラストエリア（テスト用紙 → もちくま → iPad） */}
+                  <div
+                    onClick={() => setActiveView('upload')}
+                    className="cursor-pointer bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-[#F3EFE6] transition"
+                  >
+                    <div className="flex items-center gap-4 text-[#7A6F63]">
+                      <div className="bg-white border border-[#D8C5A5] p-2.5 rounded-xl shadow-sm flex flex-col items-center">
+                        <FileText className="w-6 h-6 text-[#4B8364]" />
+                        <span className="text-[10px] font-bold mt-0.5">答案・解説PDF</span>
+                      </div>
+                      <MochiKumaIcon size={44} />
+                      <span className="text-[#4B8364] font-extrabold">➔</span>
+                      <div className="bg-white border-2 border-[#5C5248] p-2.5 rounded-xl shadow-sm flex flex-col items-center">
+                        <Layers className="w-6 h-6 text-[#547AA5]" />
+                        <span className="text-[10px] font-bold mt-0.5">iPadで分析</span>
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-[#5C5248] mt-1">
+                      {tests.length === 0 ? '初めてのテスト結果を登録しよう！' : 'タップして新しいテスト結果を追加する'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* カード2：成績＆志望校 グラフ（＋カリキュラムテスト切替＋志望校設定） */}
+                <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E] flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-[#C86D65]" />
+                      成績＆志望校 グラフ
+                    </h2>
+
+                    {/* 科目切り替えピル */}
+                    <div className="flex gap-1 bg-[#F3EFE6] p-1 rounded-xl">
+                      {['四科', '算数', '国語', '理科', '社会'].map(sub => (
+                        <button
+                          key={sub}
+                          onClick={() => setChartSubject(sub)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                            chartSubject === sub
+                              ? 'bg-[#4B8364] text-white shadow-sm'
+                              : 'text-[#7A6F63] hover:text-[#3D352E]'
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 偏差値 / 得点 切り替え（データがある時のみ表示） */}
+                  {tests.length > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setChartMetric('deviation')}
+                          className={`px-3 py-1 rounded-lg font-bold border ${
+                            chartMetric === 'deviation'
+                              ? 'bg-[#E6EFE9] text-[#3B6E52] border-[#4B8364]'
+                              : 'bg-white text-[#7A6F63] border-[#E2D9C8]'
+                          }`}
+                        >
+                          偏差値推移
+                        </button>
+                        <button
+                          onClick={() => setChartMetric('score')}
+                          className={`px-3 py-1 rounded-lg font-bold border ${
+                            chartMetric === 'score'
+                              ? 'bg-[#E6EFE9] text-[#3B6E52] border-[#4B8364]'
+                              : 'bg-white text-[#7A6F63] border-[#E2D9C8]'
+                          }`}
+                        >
+                          得点推移
+                        </button>
+                      </div>
+                      {latestDeviation && (
+                        <span className="font-bold text-[#5C5248]">
+                          直近の{chartSubject}偏差値: <strong className="text-[#4B8364] text-sm">{latestDeviation}</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* グラフ領域（初期状態はプレースホルダー、登録後は実グラフ） */}
+                  {chartData.length === 0 ? (
+                    <div className="bg-[#F5F2EB] border border-dashed border-[#C9BFA8] rounded-2xl h-56 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                      {/* 背景の点線イメージグラフ */}
+                      <svg className="absolute inset-0 w-full h-full opacity-25 pointer-events-none" viewBox="0 0 400 180">
+                        <path d="M 20 150 L 120 115 L 210 120 L 300 75 L 380 50" fill="none" stroke="#7A6F63" strokeWidth="3" strokeDasharray="6 6" />
+                        <line x1="20" y1="20" x2="20" y2="160" stroke="#7A6F63" strokeWidth="2" strokeDasharray="4 4" />
+                        <line x1="20" y1="160" x2="380" y2="160" stroke="#7A6F63" strokeWidth="2" strokeDasharray="4 4" />
+                      </svg>
+                      <p className="text-xs sm:text-sm font-bold text-[#5C5248] leading-relaxed z-10 max-w-xs">
+                        テストを登録すると、ここに成績の推移と志望校（最大5校）との差分がグラフで表示されます
+                      </p>
+                      <button
+                        onClick={() => setActiveView('upload')}
+                        className="mt-3 z-10 bg-white hover:bg-[#FAF6F0] text-[#4B8364] border border-[#4B8364] text-xs font-bold px-4 py-1.5 rounded-full shadow-sm transition"
+                      >
+                        ＋ 最初のテストを入力する
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="h-60 w-full bg-[#FAF8F5] p-2 rounded-2xl border border-[#EAE3D5]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#E5DEC9" />
+                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#7A6F63' }} />
+                            <YAxis
+                              domain={chartMetric === 'deviation' ? [35, 75] : ['auto', 'auto']}
+                              tick={{ fontSize: 11, fill: '#7A6F63' }}
+                            />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const d = payload[0].payload;
+                                  return (
+                                    <div className="bg-[#FFFDF9] border border-[#D8C5A5] p-3 rounded-xl shadow-md text-xs space-y-1">
+                                      <p className="font-extrabold text-[#3D352E]">{d.name}</p>
+                                      <p className="text-[#7A6F63]">{d.date} / {d.type} ({d.course})</p>
+                                      <p className="font-bold text-[#4B8364]">
+                                        {chartSubject}偏差値: {d.deviation}
+                                      </p>
+                                      <p className="font-bold text-[#5C5248]">
+                                        得点: {d.score} / {d.maxScore}点 ({d.scorePercentage}%)
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Legend wrapperStyle={{ fontSize: '11px' }} />
+
+                            {/* 志望校の目標偏差値ライン */}
+                            {chartMetric === 'deviation' &&
+                              validSchools.map(school => (
+                                <ReferenceLine
+                                  key={school.id}
+                                  y={Number(school.targetDeviation)}
+                                  stroke={school.color}
+                                  strokeDasharray="4 4"
+                                  strokeWidth={1.5}
+                                  label={{
+                                    value: `${school.name} (${school.targetDeviation})`,
+                                    position: 'insideTopRight',
+                                    fill: school.color,
+                                    fontSize: 10,
+                                    fontWeight: 'bold'
+                                  }}
+                                />
+                              ))}
+
+                            <Line
+                              type="monotone"
+                              dataKey={chartMetric}
+                              name={chartMetric === 'deviation' ? `${chartSubject} 偏差値` : `${chartSubject} 得点`}
+                              stroke={SUBJECT_STYLES[chartSubject].hex}
+                              strokeWidth={3}
+                              dot={{ r: 5, fill: SUBJECT_STYLES[chartSubject].hex, strokeWidth: 2, stroke: '#fff' }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* 志望校との差分サマリー表示 */}
+                      {validSchools.length > 0 && latestDeviation && (
+                        <div className="bg-[#F9F6F0] p-3 rounded-2xl border border-[#E5DEC9] space-y-1.5">
+                          <p className="text-xs font-bold text-[#5C5248]">🏫 登録した志望校との合格偏差値差分（直近 {latestDeviation}）：</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {validSchools.map(s => {
+                              const diff = (latestDeviation - Number(s.targetDeviation)).toFixed(1);
+                              const reached = Number(diff) >= 0;
+                              return (
+                                <div key={s.id} className="bg-white px-3 py-1.5 rounded-xl border border-[#E2D9C8] flex items-center justify-between text-xs">
+                                  <span className="font-bold truncate max-w-[130px]">{s.name} ({s.targetDeviation})</span>
+                                  <span className={`font-extrabold ${reached ? 'text-[#4B8364]' : 'text-[#C86D65]'}`}>
+                                    {reached ? `合格圏 +${diff}` : `あと ${Math.abs(Number(diff))}`}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* カリキュラムテストをグラフに含めるトグルスイッチ */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[#EAE3D5]">
+                    <div>
+                      <p className="text-xs sm:text-sm font-bold text-[#3D352E]">
+                        カリキュラムテストをグラフに含める
+                      </p>
+                      <p className="text-[11px] text-[#7A6F63]">
+                        ※クラス（コース）変更により問題・偏差値に連続性がない場合はOFFにできます
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeCurriculum(!includeCurriculum)}
+                      className={`w-12 h-7 flex items-center rounded-full p-1 transition duration-300 ${
+                        includeCurriculum ? 'bg-[#4B8364] justify-end' : 'bg-[#C9BFA8] justify-start'
+                      }`}
+                    >
+                      <div className="bg-white w-5 h-5 rounded-full shadow-md" />
+                    </button>
+                  </div>
+
+                  {/* 志望校の設定（最大5校）へのリンクバー */}
+                  <div
+                    onClick={() => setActiveView('schools')}
+                    className="cursor-pointer bg-[#F9F6F0] hover:bg-[#F1ECE1] border border-[#E2D9C8] rounded-2xl p-3.5 flex items-center justify-between transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">🏫</span>
+                      <div>
+                        <h3 className="text-sm font-extrabold text-[#3D352E]">
+                          志望校の設定（最大5校）
+                        </h3>
+                        <p className="text-xs text-[#7A6F63]">
+                          {validSchools.length === 0
+                            ? '目標偏差値などを自分で入力できる'
+                            : `${validSchools.length}校を登録済み（タップして変更）`}
+                        </p>
+                      </div>
+                    </div>
+                    <Settings className="w-5 h-5 text-[#7A6F63]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 右カラム（苦手分析と単元マップ / AI道場 / 暗記カード / おたのしみ） */}
+              <div className="lg:col-span-6 space-y-5">
+                {/* カード3：苦手分析と単元マップ（image_0, image_3 参考） */}
+                <div
+                  onClick={() => setActiveView('unitMap')}
+                  className="cursor-pointer bg-[#FFFDF9] hover:bg-[#FAF8F4] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm transition group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E] flex items-center gap-2">
+                      <span className="text-xl">🔍</span>
+                      苦手分析と単元マップ
+                    </h2>
+                    {/* 単元つながりアイコン */}
+                    <div className="flex items-center gap-1">
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#4B8364] inline-block" />
+                      <span className="w-3 h-0.5 bg-[#C9BFA8] inline-block" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#D49B35] inline-block" />
+                      <span className="w-3 h-0.5 bg-[#C9BFA8] inline-block" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#C86D65] inline-block" />
+                      <ChevronRight className="w-5 h-5 text-[#7A6F63] group-hover:translate-x-1 transition" />
+                    </div>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#5C5248] leading-relaxed">
+                    テストを追加すると、自動であなたの『得意・にがて』を分析し、単元マップ（単元同士のつながりを示すマップ）や単元ごとの正答率バーが作られます！
+                  </p>
+                  {allQuestions.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#EAE3D5] flex items-center gap-3 text-xs font-bold">
+                      <span className="text-[#4B8364]">🟢 できる単元: {Object.values(unitStatsMap).filter(u => u.correct === u.total).length}</span>
+                      <span className="text-[#C86D65]">🔴 にがて・要復習: {Object.values(unitStatsMap).filter(u => u.correct < u.total).length}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* カード4：AI道場（解き直し＆類題・応用）＋ 正答率基準ボタン */}
+                <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E] flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-[#D49B35] text-white flex items-center justify-center text-xs font-bold">AI</span>
+                      AI道場 (解き直し＆類題・応用)
+                    </h2>
+                    <span className="text-2xl" title="ペンギンコーチ">🐧✏️</span>
+                  </div>
+
+                  <p className="text-xs font-bold text-[#5C5248]">
+                    新機能「復習の基準（正答率）」を自分で設定して挑戦！
+                  </p>
+
+                  {/* 正答率30% / 40% / 50%以上 切り替えピルボタン */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { val: 30, label: '正答率30%以上' },
+                      { val: 40, label: '正答率40%以上' },
+                      { val: 50, label: '正答率50%以上 (標準)' }
+                    ].map(btn => (
+                      <button
+                        key={btn.val}
+                        type="button"
+                        onClick={() => setAccuracyThreshold(btn.val)}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold border transition ${
+                          accuracyThreshold === btn.val
+                            ? 'bg-[#B8D4C4] text-[#2C5840] border-[#4B8364] shadow-sm'
+                            : 'bg-[#F9F6F0] text-[#5C5248] border-[#D8C5A5] hover:bg-[#EFEAE0]'
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-[#5C5248] leading-relaxed">
+                    間違えた問題はくわしい解説で、正解できたらそっくりの類題や応用問題に挑戦！
+                  </p>
+
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      onClick={() => setActiveView('dojo')}
+                      className="bg-[#4B8364] hover:bg-[#3B6E52] text-white text-xs sm:text-sm font-bold px-5 py-2 rounded-full transition flex items-center gap-1.5"
+                    >
+                      <span>AI道場へ進む（基準: 正答率{accuracyThreshold}%以上）</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* カード5：暗記カード（理科・社会） */}
+                <div
+                  onClick={() => setActiveView('flashcards')}
+                  className="cursor-pointer bg-[#FFFDF9] hover:bg-[#FAF8F4] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm flex items-center justify-between gap-4 transition group"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🎴</span>
+                      <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E]">
+                        暗記カード（理科・社会・国語）
+                      </h2>
+                      {flashcards.length > 0 && (
+                        <span className="text-xs font-bold bg-[#FDF3DC] text-[#9C711C] px-2.5 py-0.5 rounded-full">
+                          {flashcards.length}枚
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-[#5C5248]">
+                      自分でカードを作ったり、テストで間違えた問題から一問一答で暗記をマスターしよう！
+                    </p>
+                  </div>
+                  <div className="shrink-0 bg-[#F9F6F0] border border-[#D8C5A5] px-3 py-2 rounded-2xl flex items-center gap-1 text-xs font-bold text-[#5C5248] group-hover:border-[#4B8364]">
+                    <span>⭐ カードを開く</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+
+                {/* カード6：おたのしみ（学習のきろく） */}
+                <div
+                  onClick={() => setActiveView('records')}
+                  className="cursor-pointer bg-[#FFFDF9] hover:bg-[#FAF8F4] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm flex items-center justify-between gap-4 transition"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="text-3xl shrink-0">🎁</div>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-extrabold text-[#3D352E] flex items-center gap-2">
+                        <span>おたのしみ（学習のきろく）</span>
+                      </h2>
+                      <p className="text-xs sm:text-sm text-[#5C5248] mt-0.5">
+                        勉強した分だけ少しずつレベルアップする、控えめなゲーム・キャラクター育成要素
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-2xl">🌰</span>
+                    <p className="text-xs font-extrabold text-[#4B8364]">{acorns}個</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 2. 苦手分析と単元マップ（image_0.png & image_3.png 完全再現） ==================== */}
+        {activeView === 'unitMap' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h2 className="text-2xl font-extrabold text-[#3D352E]">単元マップ ＆ 苦手分析</h2>
+
+              {/* 科目タブ（image_0.png と同じ丸みのある緑ピルボタン） */}
+              <div className="flex flex-wrap gap-2">
+                {['算数', '国語', '理科', '社会'].map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setSelectedSubject(sub)}
+                    className={`px-5 py-2 rounded-full font-extrabold text-sm transition border ${
+                      selectedSubject === sub
+                        ? 'bg-[#4B8364] text-white border-[#4B8364] shadow-sm'
+                        : 'bg-[#FFFDF9] text-[#5C5248] border-[#E2D9C8] hover:bg-[#F5EFE6]'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* もちくまの単元アドバイス吹き出し（image_0.png & image_3.png 再現） */}
+            <div className="flex items-center gap-4">
+              <MochiKumaIcon size={56} className="shrink-0" />
+              <div className="flex-1 bg-[#FFFDF9] border border-[#D8C5A5] rounded-2xl px-5 py-3.5 shadow-sm text-xs sm:text-sm font-bold text-[#3D352E]">
+                {allQuestions.filter(q => q.subject === selectedSubject).length === 0 ? (
+                  <span>
+                    まだ「{selectedSubject}」のテスト問題データがありません。「テスト結果・解答を追加する」から問題を登録すると、優先して復習したい単元をおすすめするよ！
+                  </span>
+                ) : (
+                  <span>
+                    {studentName ? `${studentName}ちゃん、` : ''}
+                    「{selectedSubject}」で次に固めたい単元をチェックしよう！正答率{accuracyThreshold}%以上の取りこぼしから先に復習すると、次の単元も解きやすくなるよ。
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 進捗カラーバー（できる / もう少し / にがて / まだデータなし） */}
+            {(() => {
+              const allCurriculumUnits = CURRICULUM_MAP[selectedSubject].flatMap(c => c.units);
+              let canDo = 0;
+              let almost = 0;
+              let weak = 0;
+              let noData = 0;
+
+              allCurriculumUnits.forEach(u => {
+                const stat = unitStatsMap[`${selectedSubject}:${u}`];
+                if (!stat) {
+                  noData++;
+                } else {
+                  const rate = (stat.correct / stat.total) * 100;
+                  if (rate >= 80) canDo++;
+                  else if (rate >= 50) almost++;
+                  else weak++;
+                }
+              });
+
+              const total = allCurriculumUnits.length;
+              return (
+                <div className="space-y-2">
+                  <div className="w-full h-3.5 bg-[#E2DCD0] rounded-full overflow-hidden flex">
+                    <div style={{ width: `${(canDo / total) * 100}%` }} className="bg-[#4B8364] h-full transition-all" />
+                    <div style={{ width: `${(almost / total) * 100}%` }} className="bg-[#D49B35] h-full transition-all" />
+                    <div style={{ width: `${(weak / total) * 100}%` }} className="bg-[#C86D65] h-full transition-all" />
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-xs font-bold text-[#5C5248]">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm border-2 border-[#4B8364] inline-block" /> できる {canDo}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm border-2 border-[#D49B35] inline-block" /> もう少し {almost}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm border-2 border-[#C86D65] inline-block" /> にがて {weak}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-sm border-2 border-[#B8AFA0] inline-block" /> まだデータなし {noData}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 単元ごとの正答率＆取りこぼし一覧（image_3.png の横棒グラフUI再現） */}
+            <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-base text-[#3D352E]">
+                  単元ごとの正答率（登録されたテスト問題より）
+                </h3>
+                <span className="text-xs font-bold text-[#7A6F63]">
+                  取りこぼし基準: 全体正答率{accuracyThreshold}%以上
+                </span>
+              </div>
+
+              {Object.values(unitStatsMap).filter(u => u.subject === selectedSubject).length === 0 ? (
+                <div className="bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl p-6 text-center space-y-2">
+                  <p className="text-sm font-bold text-[#5C5248]">
+                    まだ「{selectedSubject}」の問題データが登録されていません。
+                  </p>
+                  <button
+                    onClick={() => setActiveView('upload')}
+                    className="bg-[#4B8364] text-white text-xs font-bold px-4 py-2 rounded-full"
+                  >
+                    ＋ テスト結果を追加する
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-[#EFEAE0]">
+                  {Object.values(unitStatsMap)
+                    .filter(u => u.subject === selectedSubject)
+                    .map((u, idx) => {
+                      const pct = Math.round((u.correct / u.total) * 100);
+                      const isGood = pct >= 60;
+                      return (
+                        <div key={idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <span className="font-bold text-sm text-[#3D352E] sm:w-44 truncate">{u.unit}</span>
+                          <div className="flex-1 bg-[#EFEAE0] h-3 rounded-full overflow-hidden mx-2">
+                            <div
+                              className={`h-full rounded-full transition-all ${isGood ? 'bg-[#4B8364]' : 'bg-[#C86D65]'}`}
+                              style={{ width: `${Math.max(4, pct)}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-4 sm:w-56 text-xs">
+                            <span className="font-extrabold text-[#3D352E] w-12 text-right">{pct}%</span>
+                            <span className="text-[#7A6F63] w-12">{u.correct}/{u.total}問</span>
+                            <span className={`font-bold w-24 text-right ${u.missedHighAcc > 0 ? 'text-[#C86D65]' : 'text-[#4B8364]'}`}>
+                              {u.missedHighAcc > 0 ? `取りこぼし ${u.missedHighAcc}` : '取りこぼし 0'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* 単元マップ（左が土台、右へ行くほど発展のフロー表示 / image_0.png 再現） */}
+            <div className="space-y-3">
+              <p className="text-xs text-[#7A6F63] font-bold">
+                左が土台、右へ行くほど発展。線は「この単元ができると、次の単元が解きやすくなる」つながりです。単元をタップするとAI演習ができます。
+              </p>
+
+              <div className="space-y-4">
+                {CURRICULUM_MAP[selectedSubject].map((cat, idx) => (
+                  <div key={idx} className="bg-[#EFEAE0]/70 border border-[#E2D9C8] rounded-3xl p-4 sm:p-5 space-y-3">
+                    <h4 className="text-xs font-extrabold text-[#5C5248]">{cat.category}</h4>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {cat.units.map((unitName, uIdx) => {
+                        const stat = unitStatsMap[`${selectedSubject}:${unitName}`];
+                        const pct = stat ? Math.round((stat.correct / stat.total) * 100) : null;
+                        let borderColor = 'border-[#D5CCB8] bg-[#FAF8F4] text-[#7A6F63]';
+                        if (pct !== null) {
+                          if (pct >= 80) borderColor = 'border-[#4B8364] bg-[#E6EFE9] text-[#2C5840]';
+                          else if (pct >= 50) borderColor = 'border-[#D49B35] bg-[#FDF3DC] text-[#805B10]';
+                          else borderColor = 'border-[#C86D65] bg-[#F5E6E4] text-[#8F3A34]';
+                        }
+
+                        return (
+                          <React.Fragment key={unitName}>
+                            <div
+                              onClick={() => {
+                                const targetQ = stat?.questions?.[0] || {
+                                  id: `map-${selectedSubject}-${unitName}`,
+                                  subject: selectedSubject,
+                                  number: '単元演習',
+                                  unit: unitName,
+                                  isCorrect: pct !== null && pct >= 80,
+                                  accuracyRate: 55,
+                                  questionSummary: `${unitName}の基本〜標準問題`
+                                };
+                                startDojoExercise(targetQ, pct !== null && pct >= 80 ? 'advanced' : 'review');
+                              }}
+                              className={`cursor-pointer border-2 rounded-2xl px-4 py-3 min-w-[140px] shadow-sm hover:scale-[1.02] transition ${borderColor}`}
+                            >
+                              <p className="font-extrabold text-xs sm:text-sm">{unitName}</p>
+                              <p className="text-[11px] mt-1 font-bold opacity-80">
+                                {stat ? `${pct}% (${stat.total}問)` : '未登録（タップで演習）'}
+                              </p>
+                            </div>
+                            {uIdx < cat.units.length - 1 && (
+                              <span className="text-[#B8AFA0] font-bold hidden sm:inline">―▶</span>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 3. AI道場・演習画面（image_2.png の「算数の演習」UI忠実再現） ==================== */}
+        {activeView === 'dojo' && (
+          <div className="space-y-6">
+            {/* 上部タイトルと正答率フィルター切り替え */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-[#3D352E]">
+                  AI道場（解き直し＆類題・応用演習）
+                </h2>
+                <p className="text-xs sm:text-sm text-[#7A6F63] mt-0.5">
+                  間違えた問題は正答率基準（30% / 40% / 50%以上）で絞り込んで復習し、得意な問題は応用問題に挑戦できます。
+                </p>
+              </div>
+
+              {/* 復習の正答率基準切り替えボタン */}
+              <div className="flex flex-wrap gap-2 bg-[#FFFDF9] p-1.5 rounded-full border border-[#D8C5A5]">
+                {[30, 40, 50].map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setAccuracyThreshold(val)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold transition ${
+                      accuracyThreshold === val
+                        ? 'bg-[#4B8364] text-white shadow-sm'
+                        : 'text-[#5C5248] hover:bg-[#F3EFE6]'
+                    }`}
+                  >
+                    正答率{val}%以上
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 演習中の問題カード（image_2.png 再現） */}
+            {activeQuestion && (
+              <div className="bg-[#FFFDF9] border-2 border-[#D8C5A5] rounded-3xl p-5 sm:p-7 shadow-md space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EFEAE0] pb-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-extrabold ${
+                        activeQuestion.mode === 'review'
+                          ? 'bg-[#F5E6E4] text-[#A64B44]'
+                          : 'bg-[#E6EFE9] text-[#3B6E52]'
+                      }`}
+                    >
+                      {activeQuestion.mode === 'review' ? 'まちがえた（解き直し＆類題）' : '得意を伸ばす（応用問題）'}
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold text-[#7A6F63]">
+                      {activeQuestion.subject}・{activeQuestion.unit} ・ もとの問題 {activeQuestion.number} (正答率{activeQuestion.accuracyRate}%)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setActiveQuestion(null)}
+                    className="text-xs font-bold text-[#5C5248] border border-[#D8C5A5] px-3 py-1 rounded-lg hover:bg-[#F3EFE6]"
+                  >
+                    問題一覧にもどる
+                  </button>
+                </div>
+
+                {isGeneratingAi ? (
+                  <div className="py-12 text-center space-y-3">
+                    <RefreshCw className="w-8 h-8 text-[#4B8364] animate-spin mx-auto" />
+                    <p className="text-sm font-bold text-[#5C5248]">
+                      パーソナルコーチが「{activeQuestion.unit}」の解説と演習問題を作成しています...
+                    </p>
+                  </div>
+                ) : (
+                  aiGeneratedContent && (
+                    <div className="space-y-5">
+                      {/* 問題文 */}
+                      <p className="text-base sm:text-lg font-bold text-[#3D352E] leading-relaxed bg-[#FAF8F4] p-4 rounded-2xl border border-[#EAE3D5]">
+                        {aiGeneratedContent.problemText}
+                      </p>
+
+                      {/* こたえ入力欄 ＋ こたえあわせボタン（image_2.png 再現） */}
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          type="text"
+                          placeholder="こたえを入力（例: 50、3/4、ア など）またはノートに解いて確認"
+                          value={userAnswerInput}
+                          onChange={e => setUserAnswerInput(e.target.value)}
+                          className="flex-1 bg-white border border-[#C9BFA8] rounded-2xl px-4 py-3 text-sm sm:text-base font-bold text-[#3D352E] focus:outline-none focus:border-[#4B8364]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              userAnswerInput.trim() !== '' &&
+                              aiGeneratedContent.expectedAnswer &&
+                              userAnswerInput.includes(aiGeneratedContent.expectedAnswer.replace(/[^0-9a-zA-Zぁ-んァ-ヶ一-龠]/g, ''))
+                            ) {
+                              setAnswerFeedback('correct');
+                            } else {
+                              setAnswerFeedback('checked');
+                            }
+                            setShowFullExplanation(true);
+                          }}
+                          className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold px-6 py-3 rounded-2xl shadow-sm transition shrink-0"
+                        >
+                          こたえあわせ
+                        </button>
+                      </div>
+
+                      {/* ヒント表示ボックス */}
+                      {hintLevel >= 1 && (
+                        <div className="bg-[#F5EFE0] border border-[#E2D3B3] rounded-2xl p-4 text-xs sm:text-sm text-[#4A3F31] font-medium leading-relaxed">
+                          <strong>ヒント1：</strong> {aiGeneratedContent.hint1}
+                        </div>
+                      )}
+                      {hintLevel >= 2 && (
+                        <div className="bg-[#F5EFE0] border border-[#E2D3B3] rounded-2xl p-4 text-xs sm:text-sm text-[#4A3F31] font-medium leading-relaxed">
+                          <strong>ヒント2：</strong> {aiGeneratedContent.hint2}
+                        </div>
+                      )}
+
+                      {/* ヒントボタン ＆ こたえととき方を見るボタン（image_2.png 再現） */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {hintLevel < 2 && (
+                          <button
+                            type="button"
+                            onClick={() => setHintLevel(prev => prev + 1)}
+                            className="bg-white hover:bg-[#F3EFE6] text-[#2C5840] border-2 border-[#4B8364] font-extrabold text-xs sm:text-sm px-4 py-2 rounded-xl transition"
+                          >
+                            ヒント{hintLevel + 1}を見る
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowFullExplanation(!showFullExplanation)}
+                          className="bg-white hover:bg-[#F3EFE6] text-[#5C5248] border border-[#D8C5A5] font-bold text-xs sm:text-sm px-4 py-2 rounded-xl transition"
+                        >
+                          {showFullExplanation ? '解説を閉じる' : 'こたえと とき方を見る'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startDojoExercise(activeQuestion, activeQuestion.mode)}
+                          className="text-xs font-bold text-[#4B8364] hover:underline ml-auto flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          別の類題をつくる
+                        </button>
+                      </div>
+
+                      {/* 詳しいステップ解説と答え */}
+                      {showFullExplanation && (
+                        <div className="bg-[#F4F8F5] border border-[#B8D4C4] rounded-2xl p-5 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm sm:text-base font-extrabold text-[#2C5840]">
+                              ⭕ こたえ：{aiGeneratedContent.expectedAnswer}
+                            </p>
+                            {answerFeedback === 'correct' && (
+                              <span className="bg-[#4B8364] text-white text-xs font-bold px-3 py-1 rounded-full">
+                                大正解！すばらしい！
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-2 pt-2">
+                            <p className="text-xs font-extrabold text-[#3B6E52]">【くわしい解き方・ステップ解説】</p>
+                            {aiGeneratedContent.stepExplanation?.map((step, i) => (
+                              <p key={i} className="text-xs sm:text-sm text-[#3D352E] bg-white p-3 rounded-xl border border-[#DCE8E0] leading-relaxed">
+                                {step}
+                              </p>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-3">
+                            <div className="flex items-center gap-2 text-xs font-bold text-[#5C5248]">
+                              <MochiKumaIcon size={32} />
+                              <span>{aiGeneratedContent.coachComment}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!solvedQuestionIds.includes(activeQuestion.id)) {
+                                  setSolvedQuestionIds(prev => [...prev, activeQuestion.id]);
+                                }
+                                setStudyLogs(prev => [
+                                  { id: `log-${Date.now()}`, date: new Date().toLocaleDateString('ja-JP'), title: `AI道場クリア：${activeQuestion.subject}「${activeQuestion.unit}」` },
+                                  ...prev
+                                ]);
+                                showToast(`「${activeQuestion.unit}」の演習をクリアしました！`, 20);
+                                setActiveQuestion(null);
+                              }}
+                              className="bg-[#4B8364] hover:bg-[#3B6E52] text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              理解できた！クリアにする（+20🌰）
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* 登録問題からの「間違い復習（基準正答率以上）」＆「得意の応用」リスト */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 左：間違えた問題（正答率基準フィルター連動） */}
+              <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="bg-[#F5E6E4] text-[#A64B44] text-xs font-extrabold px-3 py-1 rounded-full">
+                      復習優先（正答率 {accuracyThreshold}%以上 × まちがえた問題）
+                    </span>
+                    <h3 className="text-base font-extrabold text-[#3D352E] mt-2">
+                      詳しい解説と類題で解き直し
+                    </h3>
+                  </div>
+                </div>
+
+                {allQuestions.filter(q => !q.isCorrect && q.accuracyRate >= accuracyThreshold).length === 0 ? (
+                  <div className="bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl p-6 text-center space-y-2">
+                    <p className="text-xs sm:text-sm font-bold text-[#5C5248]">
+                      {allQuestions.length === 0
+                        ? 'まだテスト問題が登録されていません。テストを追加するか、下のサンプル演習をお試しください。'
+                        : `正答率${accuracyThreshold}%以上で間違えた問題はありません！基準を「30%以上」などに下げてみることもできます。`}
+                    </p>
+                    <button
+                      onClick={() =>
+                        startDojoExercise(
+                          {
+                            id: 'sample-review',
+                            subject: '算数',
+                            number: 'サンプル演習[8](2)',
+                            unit: '和差算',
+                            isCorrect: false,
+                            accuracyRate: 55,
+                            questionSummary: 'クッキーを2人で分けてお金をやり取りする和差算'
+                          },
+                          'review'
+                        )
+                      }
+                      className="mt-2 bg-white hover:bg-[#F3EFE6] text-[#4B8364] border border-[#4B8364] text-xs font-bold px-4 py-2 rounded-full transition"
+                    >
+                      ✏️ サンプル問題（和差算の解き直し）を体験する
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {allQuestions
+                      .filter(q => !q.isCorrect && q.accuracyRate >= accuracyThreshold)
+                      .map(q => (
+                        <div key={q.id} className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${SUBJECT_STYLES[q.subject]?.bg} ${SUBJECT_STYLES[q.subject]?.text}`}>
+                                {q.subject}
+                              </span>
+                              <span className="font-extrabold text-sm text-[#3D352E]">{q.unit}</span>
+                              <span className="text-xs font-bold text-[#A64B44] bg-[#F5E6E4] px-2 py-0.5 rounded-full">
+                                正答率 {q.accuracyRate}%
+                              </span>
+                              {q.isSolved && (
+                                <span className="text-xs font-bold text-[#4B8364] bg-[#E6EFE9] px-2 py-0.5 rounded-full">
+                                  ✓ 解き直し済
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#5C5248]">{q.questionSummary}</p>
+                            <p className="text-[10px] text-[#7A6F63]">{q.testName} / {q.number}</p>
+                          </div>
+                          <button
+                            onClick={() => startDojoExercise(q, 'review')}
+                            className="bg-[#4B8364] hover:bg-[#3B6E52] text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 transition"
+                          >
+                            解説＆類題をとく
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 右：得意な問題（正解できた問題 → 応用問題） */}
+              <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+                <div>
+                  <span className="bg-[#E6EFE9] text-[#3B6E52] text-xs font-extrabold px-3 py-1 rounded-full">
+                    得意を伸ばす（テストで正解できた単元）
+                  </span>
+                  <h3 className="text-base font-extrabold text-[#3D352E] mt-2">
+                    発展・応用問題にチャレンジ
+                  </h3>
+                </div>
+
+                {allQuestions.filter(q => q.isCorrect).length === 0 ? (
+                  <div className="bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl p-6 text-center space-y-2">
+                    <p className="text-xs sm:text-sm font-bold text-[#5C5248]">
+                      テストで正解できた得意問題を登録すると、ここから発展的な応用問題に挑戦できます。
+                    </p>
+                    <button
+                      onClick={() =>
+                        startDojoExercise(
+                          {
+                            id: 'sample-adv',
+                            subject: '算数',
+                            number: 'サンプル応用',
+                            unit: '分配算・和差算',
+                            isCorrect: true,
+                            accuracyRate: 68,
+                            questionSummary: '3人でノートを分ける応用問題'
+                          },
+                          'advanced'
+                        )
+                      }
+                      className="mt-2 bg-white hover:bg-[#F3EFE6] text-[#4B8364] border border-[#4B8364] text-xs font-bold px-4 py-2 rounded-full transition"
+                    >
+                      👑 サンプル応用問題を体験する
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {allQuestions
+                      .filter(q => q.isCorrect)
+                      .map(q => (
+                        <div key={q.id} className="p-4 rounded-2xl bg-[#FAF8F4] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${SUBJECT_STYLES[q.subject]?.bg} ${SUBJECT_STYLES[q.subject]?.text}`}>
+                                {q.subject}
+                              </span>
+                              <span className="font-extrabold text-sm text-[#3D352E]">{q.unit}</span>
+                              <span className="text-xs font-bold text-[#3B6E52] bg-[#E6EFE9] px-2 py-0.5 rounded-full">
+                                正答率 {q.accuracyRate}% ⭕
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#5C5248]">{q.questionSummary}</p>
+                            <p className="text-[10px] text-[#7A6F63]">{q.testName} / {q.number}</p>
+                          </div>
+                          <button
+                            onClick={() => startDojoExercise(q, 'advanced')}
+                            className="bg-[#547AA5] hover:bg-[#3E5F8A] text-white text-xs font-bold px-4 py-2 rounded-xl shrink-0 transition"
+                          >
+                            応用問題をだす
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 4. テスト結果・PDF追加画面（iPad対応） ==================== */}
+        {activeView === 'upload' && (
+          <form onSubmit={handleSaveTest} className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-7 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EFEAE0] pb-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-[#3D352E] flex items-center gap-2">
+                  <Upload className="w-6 h-6 text-[#4B8364]" />
+                  テスト結果・答案PDF・解答解説の追加
+                </h2>
+                <p className="text-xs sm:text-sm text-[#7A6F63] mt-1">
+                  iPadから答案や正答率表のPDF・写真を添付し、点数と注目問題（間違えた問題や得意問題）を記録しましょう。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAiScanFiles}
+                disabled={isScanningFiles}
+                className="bg-[#E6EFE9] hover:bg-[#D5E6DC] text-[#2C5840] border border-[#4B8364] font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-2xl flex items-center gap-2 shrink-0 transition"
+              >
+                {isScanningFiles ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    AIで読み取り中...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    AIで書類から問題リストを自動作成
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* PDF・写真添付エリア */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: 'answerSheet', title: '① 答案用紙 (PDF / 写真)', desc: '子どもの答案をiPadで撮影または選択' },
+                { key: 'explanation', title: '② 解答・解説 (PDF / 写真)', desc: '解説冊子のPDFや写真' },
+                { key: 'accuracySheet', title: '③ 問題ごとの正答率表', desc: 'マイページ等の正答率データ' }
+              ].map(item => {
+                const f = uploadForm.files[item.key];
+                return (
+                  <label
+                    key={item.key}
+                    className={`cursor-pointer rounded-2xl border-2 border-dashed p-4 text-center flex flex-col items-center justify-center transition ${
+                      f ? 'bg-[#E6EFE9]/60 border-[#4B8364]' : 'bg-[#F9F6F0] border-[#D8C5A5] hover:bg-[#F3EFE6]'
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={e => handleFileSelect(item.key, e)}
+                      className="hidden"
+                    />
+                    <FileText className="w-6 h-6 text-[#4B8364] mb-1.5" />
+                    <p className="font-extrabold text-xs sm:text-sm text-[#3D352E]">{item.title}</p>
+                    <p className="text-[11px] text-[#7A6F63] mt-0.5">{item.desc}</p>
+                    {f ? (
+                      <span className="mt-2 bg-white text-[#2C5840] border border-[#4B8364] text-xs font-bold px-3 py-0.5 rounded-full">
+                        ✓ {f.name}
+                      </span>
+                    ) : (
+                      <span className="mt-2 bg-white text-[#5C5248] border border-[#D8C5A5] text-xs font-bold px-3 py-0.5 rounded-full">
+                        ファイル・写真を選択
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* テスト基本情報 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#5C5248] mb-1">テストの種類</label>
+                <select
+                  value={uploadForm.type}
+                  onChange={e => handleTestTypeChange(e.target.value)}
+                  className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2.5 text-sm font-bold text-[#3D352E]"
+                >
+                  <option value="組分けテスト">四谷大塚 公開組分けテスト</option>
+                  <option value="カリキュラムテスト">カリキュラムテスト（コース別）</option>
+                  <option value="全統小">全国統一小学生テスト</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5C5248] mb-1">テスト名（回数など）</label>
+                <input
+                  type="text"
+                  placeholder="例：第4回 公開組分けテスト"
+                  value={uploadForm.name}
+                  onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })}
+                  className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2.5 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5C5248] mb-1">クラス / コース</label>
+                <input
+                  type="text"
+                  placeholder="例：Bコース / Cコース"
+                  value={uploadForm.course}
+                  onChange={e => setUploadForm({ ...uploadForm, course: e.target.value })}
+                  className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2.5 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5C5248] mb-1">実施日</label>
+                <input
+                  type="date"
+                  value={uploadForm.date}
+                  onChange={e => setUploadForm({ ...uploadForm, date: e.target.value })}
+                  className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2.5 text-sm font-bold"
+                />
+              </div>
+            </div>
+
+            {/* 4科目＋四科合計の得点と偏差値 */}
+            <div>
+              <h3 className="text-sm font-extrabold text-[#3D352E] mb-2.5">科目ごとの得点と偏差値</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {['算数', '国語', '理科', '社会', '四科'].map(sub => (
+                  <div key={sub} className={`p-3 rounded-2xl border ${SUBJECT_STYLES[sub].bg} ${SUBJECT_STYLES[sub].border}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`font-extrabold text-sm ${SUBJECT_STYLES[sub].text}`}>{sub}</span>
+                      <span className="text-[11px] text-[#7A6F63]">/{uploadForm.scores[sub].maxScore}点</span>
+                    </div>
+                    <div className="space-y-2">
+                      <input
+                        type="number"
+                        placeholder="得点"
+                        value={uploadForm.scores[sub].score}
+                        onChange={e =>
+                          setUploadForm({
+                            ...uploadForm,
+                            scores: {
+                              ...uploadForm.scores,
+                              [sub]: { ...uploadForm.scores[sub], score: e.target.value }
+                            }
+                          })
+                        }
+                        className="w-full bg-white rounded-lg px-2.5 py-1.5 text-xs font-bold border border-[#D8C5A5]"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="偏差値"
+                        value={uploadForm.scores[sub].deviation}
+                        onChange={e =>
+                          setUploadForm({
+                            ...uploadForm,
+                            scores: {
+                              ...uploadForm.scores,
+                              [sub]: { ...uploadForm.scores[sub], deviation: e.target.value }
+                            }
+                          })
+                        }
+                        className="w-full bg-white rounded-lg px-2.5 py-1.5 text-xs font-bold border border-[#D8C5A5]"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 問題ごとの正答率と正誤入力 */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-[#3D352E]">
+                    問題ごとの正答率と正誤（間違えた問題・伸ばしたい得意問題）
+                  </h3>
+                  <p className="text-xs text-[#7A6F63]">
+                    全体の正答率（%）を入れておくと、30%・40%・50%の基準ごとに復習リストを自動で切り替えられます。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setUploadForm(prev => ({
+                      ...prev,
+                      questions: [
+                        ...prev.questions,
+                        {
+                          id: `q-row-${Date.now()}`,
+                          subject: '算数',
+                          number: `大問${prev.questions.length + 2}`,
+                          unit: '',
+                          isCorrect: false,
+                          accuracyRate: 50,
+                          questionSummary: ''
+                        }
+                      ]
+                    }))
+                  }
+                  className="bg-[#E6EFE9] hover:bg-[#D5E6DC] text-[#2C5840] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  問題を追加
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                {uploadForm.questions.map((q, idx) => (
+                  <div key={q.id} className="p-3 rounded-2xl bg-[#F9F6F0] border border-[#E2D9C8] grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                    <div className="md:col-span-2">
+                      <select
+                        value={q.subject}
+                        onChange={e => {
+                          const next = [...uploadForm.questions];
+                          next[idx].subject = e.target.value;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className="w-full rounded-lg border border-[#D8C5A5] bg-white px-2 py-1.5 text-xs font-bold"
+                      >
+                        <option value="算数">算数</option>
+                        <option value="国語">国語</option>
+                        <option value="理科">理科</option>
+                        <option value="社会">社会</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <input
+                        type="text"
+                        placeholder="問題番号 (例: 大問3(2))"
+                        value={q.number}
+                        onChange={e => {
+                          const next = [...uploadForm.questions];
+                          next[idx].number = e.target.value;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className="w-full rounded-lg border border-[#D8C5A5] bg-white px-2.5 py-1.5 text-xs font-bold"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <input
+                        type="text"
+                        placeholder="単元名 (例: 和差算)"
+                        value={q.unit}
+                        onChange={e => {
+                          const next = [...uploadForm.questions];
+                          next[idx].unit = e.target.value;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className="w-full rounded-lg border border-[#D8C5A5] bg-white px-2.5 py-1.5 text-xs font-bold"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <input
+                        type="text"
+                        placeholder="問題の内容メモ"
+                        value={q.questionSummary}
+                        onChange={e => {
+                          const next = [...uploadForm.questions];
+                          next[idx].questionSummary = e.target.value;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className="w-full rounded-lg border border-[#D8C5A5] bg-white px-2.5 py-1.5 text-xs"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-1">
+                      <span className="text-[11px] font-bold text-[#7A6F63] shrink-0">正答率</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={q.accuracyRate}
+                        onChange={e => {
+                          const next = [...uploadForm.questions];
+                          next[idx].accuracyRate = e.target.value;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className="w-16 rounded-lg border border-[#D8C5A5] bg-white px-2 py-1.5 text-xs font-bold"
+                      />
+                      <span className="text-xs text-[#7A6F63]">%</span>
+                    </div>
+                    <div className="md:col-span-1 flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...uploadForm.questions];
+                          next[idx].isCorrect = !next[idx].isCorrect;
+                          setUploadForm({ ...uploadForm, questions: next });
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold ${
+                          q.isCorrect ? 'bg-[#E6EFE9] text-[#2C5840]' : 'bg-[#F5E6E4] text-[#A64B44]'
+                        }`}
+                      >
+                        {q.isCorrect ? '⭕正解' : '❌不正解'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveView('home')}
+                className="bg-[#F3EFE6] hover:bg-[#E5DEC9] text-[#5C5248] font-bold px-5 py-3 rounded-full text-sm transition"
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold px-8 py-3 rounded-full shadow-sm text-sm transition"
+              >
+                このテスト結果を登録する（+30🌰）
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ==================== 5. 暗記カード（理科・社会・国語の一問一答） ==================== */}
+        {activeView === 'flashcards' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-[#3D352E] flex items-center gap-2">
+                  <span>🎴</span>
+                  暗記カード（一問一答・自分で作成）
+                </h2>
+                <p className="text-xs sm:text-sm text-[#7A6F63] mt-0.5">
+                  最初はデータが空です。覚えたい理科・社会の用語や、テストで間違えた問題から自分だけの暗記カードを作れます！
+                </p>
+              </div>
+
+              {allQuestions.filter(q => !q.isCorrect).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wrongQs = allQuestions.filter(q => !q.isCorrect);
+                    const created = wrongQs.map((q, i) => ({
+                      id: `fc-auto-${Date.now()}-${i}`,
+                      subject: q.subject,
+                      unit: q.unit,
+                      front: `【${q.unit}】${q.questionSummary}`,
+                      back: `テスト（${q.testName} ${q.number}）の見直しポイントを確認しよう！`,
+                      mastered: false
+                    }));
+                    setFlashcards(prev => [...prev, ...created]);
+                    showToast(`テストの間違い問題から ${created.length}枚のカードを作成しました！`, 15);
+                  }}
+                  className="bg-[#E6EFE9] hover:bg-[#D5E6DC] text-[#2C5840] border border-[#4B8364] text-xs font-extrabold px-4 py-2.5 rounded-full transition"
+                >
+                  ＋ テストの間違い問題から自動作成する
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* 左7列：カードめくり演習ゾーン */}
+              <div className="lg:col-span-7 bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-1.5">
+                    {['すべて', '理科', '社会', '算数', '国語'].map(sub => (
+                      <button
+                        key={sub}
+                        onClick={() => {
+                          setCardSubjectFilter(sub);
+                          setCurrentCardIndex(0);
+                          setIsCardFlipped(false);
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition ${
+                          cardSubjectFilter === sub
+                            ? 'bg-[#4B8364] text-white'
+                            : 'bg-[#F3EFE6] text-[#7A6F63]'
+                        }`}
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-[#7A6F63]">
+                    {filteredCards.length > 0 ? `${currentCardIndex + 1} / ${filteredCards.length} 枚目` : '0 枚'}
+                  </span>
+                </div>
+
+                {filteredCards.length === 0 ? (
+                  <div className="bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl h-64 p-6 flex flex-col items-center justify-center text-center space-y-3">
+                    <MochiKumaIcon size={52} />
+                    <p className="text-sm font-bold text-[#5C5248]">
+                      まだ暗記カードがありません。右のフォームから最初の1枚を作ってみよう！
+                    </p>
+                  </div>
+                ) : (
+                  (() => {
+                    const card = filteredCards[currentCardIndex] || filteredCards[0];
+                    return (
+                      <div className="space-y-4">
+                        <div
+                          onClick={() => setIsCardFlipped(!isCardFlipped)}
+                          className={`cursor-pointer rounded-3xl border-2 p-8 h-64 flex flex-col items-center justify-center text-center transition-all shadow-sm select-none ${
+                            isCardFlipped
+                              ? 'bg-[#E6EFE9] border-[#4B8364]'
+                              : 'bg-[#FAF8F4] border-[#D8C5A5] hover:border-[#4B8364]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-white text-[#5C5248] border border-[#D8C5A5]">
+                              {card.subject} {card.unit && `・ ${card.unit}`}
+                            </span>
+                            <span className="text-xs font-bold text-[#7A6F63]">
+                              {isCardFlipped ? '💡 うら（こたえ）' : '❓ おもて（もんだい）'}
+                            </span>
+                          </div>
+                          <p className="text-base sm:text-xl font-extrabold text-[#3D352E] leading-relaxed">
+                            {isCardFlipped ? card.back : card.front}
+                          </p>
+                          <p className="text-xs text-[#7A6F63] mt-6">
+                            （カードをタップすると裏返ります）
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCardFlipped(false);
+                              setCurrentCardIndex(prev => (prev > 0 ? prev - 1 : filteredCards.length - 1));
+                            }}
+                            className="bg-[#F3EFE6] hover:bg-[#E5DEC9] text-[#5C5248] font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1"
+                          >
+                            <ChevronLeft className="w-4 h-4" /> まえへ
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              showToast('バッチリ覚えたね！どんぐり+5個', 5);
+                              setIsCardFlipped(false);
+                              setCurrentCardIndex(prev => (prev < filteredCards.length - 1 ? prev + 1 : 0));
+                            }}
+                            className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold px-5 py-2.5 rounded-xl text-xs"
+                          >
+                            ⭕ おぼえた！（+5🌰）
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCardFlipped(false);
+                              setCurrentCardIndex(prev => (prev < filteredCards.length - 1 ? prev + 1 : 0));
+                            }}
+                            className="bg-[#F3EFE6] hover:bg-[#E5DEC9] text-[#5C5248] font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1"
+                          >
+                            つぎへ <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* 右5列：新しい暗記カードを追加するフォーム */}
+              <div className="lg:col-span-5 bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+                <h3 className="text-base font-extrabold text-[#3D352E]">
+                  ＋ 新しい暗記カードを作る
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#5C5248] mb-1">科目</label>
+                    <select
+                      value={newCardForm.subject}
+                      onChange={e => setNewCardForm({ ...newCardForm, subject: e.target.value })}
+                      className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2 text-xs font-bold"
+                    >
+                      <option value="理科">理科</option>
+                      <option value="社会">社会</option>
+                      <option value="国語">国語（漢字・語句）</option>
+                      <option value="算数">算数（公式・単位）</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#5C5248] mb-1">単元名</label>
+                    <input
+                      type="text"
+                      placeholder="例：春の生物 / 都道府県"
+                      value={newCardForm.unit}
+                      onChange={e => setNewCardForm({ ...newCardForm, unit: e.target.value })}
+                      className="w-full rounded-xl border border-[#D8C5A5] bg-white px-3 py-2 text-xs font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5248] mb-1">おもて（問題）</label>
+                  <textarea
+                    rows={2}
+                    placeholder="例：モンシロチョウの幼虫が食べる葉っぱ（食草）は何？"
+                    value={newCardForm.front}
+                    onChange={e => setNewCardForm({ ...newCardForm, front: e.target.value })}
+                    className="w-full rounded-xl border border-[#D8C5A5] bg-white p-3 text-xs font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5248] mb-1">うら（答え・解説）</label>
+                  <textarea
+                    rows={2}
+                    placeholder="例：キャベツやアブラナなどのアブラナ科の植物"
+                    value={newCardForm.back}
+                    onChange={e => setNewCardForm({ ...newCardForm, back: e.target.value })}
+                    className="w-full rounded-xl border border-[#D8C5A5] bg-white p-3 text-xs font-bold"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newCardForm.front.trim() || !newCardForm.back.trim()) {
+                      showToast('問題と答えを入力してください', 0);
+                      return;
+                    }
+                    setFlashcards(prev => [
+                      ...prev,
+                      {
+                        id: `fc-${Date.now()}`,
+                        subject: newCardForm.subject,
+                        unit: newCardForm.unit.trim(),
+                        front: newCardForm.front.trim(),
+                        back: newCardForm.back.trim()
+                      }
+                    ]);
+                    setNewCardForm({ ...newCardForm, front: '', back: '' });
+                    showToast('暗記カードを追加しました！（+10🌰）', 10);
+                  }}
+                  className="w-full bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold py-3 rounded-full text-xs sm:text-sm transition"
+                >
+                  カードを追加する（+10🌰）
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 6. 志望校の設定（最大5校・最初は空欄） ==================== */}
+        {activeView === 'schools' && (
+          <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-7 shadow-sm space-y-6">
+            <div>
+              <h2 className="text-xl font-extrabold text-[#3D352E] flex items-center gap-2">
+                <span>🏫</span>
+                志望校の設定（最大5校）
+              </h2>
+              <p className="text-xs sm:text-sm text-[#7A6F63] mt-1">
+                お子様と一緒に目標にしたい中学校名と合格目標偏差値を入力してください。入力した学校のみグラフに目標ラインとして表示されます。
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {schools.map((school, idx) => (
+                <div key={school.id} className="p-4 rounded-2xl bg-[#F9F6F0] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1">
+                    <span
+                      className="w-7 h-7 rounded-full text-white font-extrabold text-xs flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: school.color }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      placeholder={`第${idx + 1}志望の学校名を入力（例：〇〇中学校）`}
+                      value={school.name}
+                      onChange={e => {
+                        const next = [...schools];
+                        next[idx].name = e.target.value;
+                        setSchools(next);
+                      }}
+                      className="w-full bg-white rounded-xl border border-[#D8C5A5] px-3.5 py-2 text-sm font-bold text-[#3D352E]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[#5C5248]">目標偏差値:</span>
+                    <input
+                      type="number"
+                      min="30"
+                      max="80"
+                      placeholder="例: 60"
+                      value={school.targetDeviation}
+                      onChange={e => {
+                        const next = [...schools];
+                        next[idx].targetDeviation = e.target.value;
+                        setSchools(next);
+                      }}
+                      className="w-24 bg-white rounded-xl border border-[#D8C5A5] px-3 py-2 text-sm font-extrabold text-center text-[#4B8364]"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  showToast('志望校の設定を保存しました！', 5);
+                  setActiveView('home');
+                }}
+                className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-extrabold px-6 py-3 rounded-full text-sm transition"
+              >
+                保存してホームへもどる
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 7. おたのしみ（学習のきろく・控えめな育成要素） ==================== */}
+        {activeView === 'records' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-6 shadow-sm flex flex-col items-center text-center space-y-4">
+              <span className="bg-[#E6EFE9] text-[#2C5840] text-xs font-extrabold px-3.5 py-1 rounded-full">
+                2年間いっしょに歩むパーソナルコーチ
+              </span>
+              <div className="w-32 h-32 rounded-full bg-[#F9F6F0] border-2 border-[#D8C5A5] flex items-center justify-center shadow-inner">
+                <MochiKumaIcon size={88} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#7A6F63]">レベル {coachStage.level}</p>
+                <h3 className="text-xl font-extrabold text-[#3D352E] mt-0.5">
+                  {coachStage.badge} {coachStage.title}
+                </h3>
+                <p className="text-xs sm:text-sm text-[#5C5248] mt-2">{coachStage.desc}</p>
+              </div>
+
+              <div className="w-full bg-[#F9F6F0] p-4 rounded-2xl border border-[#E2D9C8] space-y-2">
+                <div className="flex justify-between text-xs font-bold text-[#5C5248]">
+                  <span>集めたどんぐり</span>
+                  <span>🌰 {acorns} / {coachStage.next} 個</span>
+                </div>
+                <div className="w-full h-3 bg-[#E5DEC9] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#4B8364] rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.round((acorns / coachStage.next) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-6 shadow-sm space-y-4">
+              <h3 className="text-base font-extrabold text-[#3D352E] flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#4B8364]" />
+                これまでの学習のきろく
+              </h3>
+              {studyLogs.length === 0 ? (
+                <div className="bg-[#F9F6F0] border border-dashed border-[#D8C5A5] rounded-2xl p-6 text-center text-xs sm:text-sm text-[#7A6F63] font-bold">
+                  まだ学習のきろくがありません。テスト登録やAI道場の解き直しをすると、ここに足あとが残ります！
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {studyLogs.map(log => (
+                    <div key={log.id} className="p-3 rounded-xl bg-[#FAF8F4] border border-[#EAE3D5] flex items-center justify-between text-xs">
+                      <span className="font-bold text-[#3D352E]">{log.title}</span>
+                      <span className="text-[#7A6F63]">{log.date}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 8. iPad共有・データ引き継ぎ画面 ==================== */}
+        {activeView === 'share' && (
+          <div className="bg-[#FFFDF9] border border-[#E2D9C8] rounded-3xl p-5 sm:p-7 shadow-sm space-y-6">
+            <div>
+              <h2 className="text-xl font-extrabold text-[#3D352E] flex items-center gap-2">
+                <Share2 className="w-6 h-6 text-[#4B8364]" />
+                子どものiPadでの利用・データ共有ガイド
+              </h2>
+              <p className="text-xs sm:text-sm text-[#7A6F63] mt-1">
+                お子様のiPadのSafari等でこのページのURLを開き、「ホーム画面に追加」すると本物のアプリのように使えます。
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* URL共有とホーム画面追加手順 */}
+              <div className="bg-[#F9F6F0] border border-[#E2D9C8] rounded-2xl p-5 space-y-3">
+                <h3 className="text-sm font-extrabold text-[#3D352E]">
+                  📱 Step 1：iPadでアプリとして使う方法
+                </h3>
+                <ol className="text-xs text-[#5C5248] space-y-2 list-decimal list-inside leading-relaxed font-medium">
+                  <li>このページのURLをお子様のiPad（メッセージやAirDrop等）に送ります。</li>
+                  <li>iPadのSafariで開き、画面上の共有ボタン（四角から上矢印）をタップして<strong>「ホーム画面に追加」</strong>を選ぶと、いつでもワンタップで開けます。</li>
+                  <li>入力したデータはブラウザ内に自動保存されます。</li>
+                </ol>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(window.location.href, '現在のページURLをコピーしました！')}
+                  className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5"
+                >
+                  <Copy className="w-4 h-4" />
+                  このアプリのURLをコピーする
+                </button>
+              </div>
+
+              {/* 端末間データ引き継ぎコード */}
+              <div className="bg-[#F9F6F0] border border-[#E2D9C8] rounded-2xl p-5 space-y-3">
+                <h3 className="text-sm font-extrabold text-[#3D352E]">
+                  🔄 Step 2：親のスマホ・PC ⇄ 子どものiPadでデータを同期する
+                </h3>
+                <p className="text-xs text-[#5C5248] leading-relaxed">
+                  別の端末に入力したテスト結果や志望校データを移したい時は、「引き継ぎコードをコピー」して、もう片方の端末に貼り付けるだけで一瞬で同期できます。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={exportBackupCode}
+                    className="bg-white hover:bg-[#EFEAE0] text-[#2C5840] border border-[#4B8364] font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5"
+                  >
+                    <Download className="w-4 h-4" />
+                    現在のデータ引き継ぎコードをコピー
+                  </button>
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="ここにコピーした引き継ぎコードを貼り付け"
+                    value={backupCodeInput}
+                    onChange={e => setBackupCodeInput(e.target.value)}
+                    className="w-full bg-white rounded-xl border border-[#D8C5A5] px-3 py-2 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={importBackupCode}
+                    className="bg-[#547AA5] hover:bg-[#3E5F8A] text-white font-bold text-xs px-4 py-2 rounded-xl"
+                  >
+                    コードを読み込んでデータを同期する
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 合言葉（パスコード）の変更エリア */}
+            <div className="bg-[#F9F6F0] border border-[#E2D9C8] rounded-2xl p-5 space-y-3">
+              <h3 className="text-sm font-extrabold text-[#3D352E] flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#4B8364]" />
+                🔒 家族専用の「合言葉（パスコード）」を変更する
+              </h3>
+              <p className="text-xs text-[#5C5248]">
+                現在の合言葉：<strong className="text-[#4B8364]">{passcode}</strong>（変更すると次回起動時から新しい合言葉でロックされます）
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 max-w-md">
+                <input
+                  type="text"
+                  placeholder="新しい合言葉・数字を入力（例: 0415）"
+                  value={newPasscodeInput}
+                  onChange={e => setNewPasscodeInput(e.target.value)}
+                  className="flex-1 bg-white rounded-xl border border-[#D8C5A5] px-3 py-2 text-xs font-bold"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newPasscodeInput.trim()) {
+                      showToast('新しい合言葉を入力してください', 0);
+                      return;
+                    }
+                    setPasscode(newPasscodeInput.trim());
+                    setNewPasscodeInput('');
+                    showToast('合言葉を更新しました！', 0);
+                  }}
+                  className="bg-[#4B8364] hover:bg-[#3B6E52] text-white font-bold text-xs px-5 py-2 rounded-xl shrink-0"
+                >
+                  合言葉を変更する
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
